@@ -24,7 +24,9 @@ define verbose-log
 	$(JOURNAL_LOGGER) $1 $(CONFIG) | tee --append $(LOG)
 endef
 
-.SILENT: build
+config:
+	$(RANDOM_CONFIG) $(if $(device), $(device), 1)
+
 build: $(CONFIG)
 	cp $< $(TEMP)
 	$(CONFIG_CONTAINER) $(TEMP) > $<
@@ -32,33 +34,23 @@ build: $(CONFIG)
 	$(call silent-log, $@)
 	touch $@
 
-.SILENT: install
 install: $(CONFIG) build
 	$(INSTALL_CONFIG) $< > $@ 
 	$(call silent-log, $@)
 	touch $@
 
-.SILENT: test
 test: $(CONFIG) install
 	$(TEST_DEVICE) $(CONFIG)
 
-.SILENT: check
 check: $(CONFIG)
 	$(CHECK_DEVICE) $(CONFIG) | $(PRETTY_JSON)
 
-.SILENT: log
 log:
 	[ -f $(LOG) ] && tail -n5 $(LOG)
 
-.SILENT: info
 info:
 	$(PRETTY_JSON) $(CONFIG)
 
-.SILENT: config
-config:
-	$(RANDOM_CONFIG) $(if $(device), $(device), 1)
-
-.SILENT: clean
 clean: $(CONFIG) build
 	$(CONTAINER) stop `jq -r '.container.id' $(CONFIG)` > /dev/null
 	$(CONTAINER) rm `jq -r '.container.id' $(CONFIG)` > /dev/null
@@ -69,6 +61,8 @@ clean: $(CONFIG) build
 	[ -f install ] && rm install
 	$(call verbose-log, $@)
 
-.SILENT: login
 login: build $(CONFIG)
 	sudo docker exec -it `jq -r '.container.id' $(CONFIG)` bash
+
+.SILENT: log check test install build info login clean config
+.PHONY: log check test info login clean config
