@@ -64,5 +64,6 @@ clean: $(CONFIG) build
 login: build $(CONFIG)
 	sudo docker exec -it `jq -r '.container.id' $(CONFIG)` bash
 
+.DEFAULT_GOAL := config
 .SILENT: log check test install build info login clean config
 .PHONY: log check test info login clean config
