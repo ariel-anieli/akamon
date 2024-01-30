@@ -5,39 +5,41 @@ import os
 import sys
 import uuid
 
-time = datetime.datetime.now().astimezone().strftime('%Y-%m-%dT%H:%M:%S%z')
-one  = lambda snmp: '-v1 -c {}'.format(snmp['community'])
-two  = lambda snmp: '-v2c -c {}'.format(snmp['community'])
+def community(snmp):
+    return '-c {}'.format(snmp['community'])
 
-def three(snmp):
-    authNoPriv   = '-l authNoPriv -u {} -a {} -A {}'.format(
-        snmp['username'],
+def security(snmp):
+    auth = lambda: '-a {} -A {}'.format(
         snmp['authentication-protocol'],
         snmp['authentication-password']
     )
-    authPriv     = '-l authPriv -u {} -a {} -A {} -x {} -X {}'.format(
-        snmp['username'],
-        snmp['authentication-protocol'],
-        snmp['authentication-password'],
+
+    priv = lambda: '-x {} -X {}'.format(
         snmp['privacy-protocol'],
         snmp['privacy-passphrase']
     )
-    noAuthNoPriv = '-v3 -l noAuthNoPriv -u {}'.format(snmp['username'])
 
-    return {
-        'authNoPriv'   : authNoPriv,
-        'authPriv'     : authPriv,
-        'noAuthNoPriv' : noAuthNoPriv
-    }[snmp['security-level']]
+    match snmp['security-level']:
+        case 'authPriv':
+            return ' '.join([auth(), priv()])
+        case 'authNoPriv':
+            return auth()
+        case 'noAuthNoPriv':
+            return ''
+
+def time():
+    return datetime.datetime.now().astimezone().strftime('%Y-%m-%dT%H:%M:%S%z')
 
 def command(snmp):
-    version = snmp['version']
-    if version=='1':
-        return one(snmp)
-    elif version=='2':
-        return two(snmp)
-    else:
-        return three(snmp)
+    match snmp['version']:
+        case '1':
+            return ' '.join(['-v1', community(snmp)])
+        case '2':
+            return ' '.join(['-v2c', community(snmp)])
+        case '3':
+            level = snmp['security-level']
+            user  = snmp['username']
+            return ' '.join(['-l {} -u {}'.format(level, user), security(snmp)])
 
 def test_device(cmd, device):
     snmp  = ' '.join([
@@ -50,7 +52,7 @@ def test_device(cmd, device):
     test  = ' '.join([cmd, shell])
 
     print(json.dumps({
-        'time'    : time,
+        'time'    : time(),
         'message' : 'test',
         'id'      : str(uuid.uuid4()),
         'device'  : device['name'],
