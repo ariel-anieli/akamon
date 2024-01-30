@@ -33,25 +33,27 @@ def pswd(size):
     charset = string.ascii_letters + string.digits
     return ''.join(secrets.choice(charset) for i in range(size))
 
-def snmp():
-    version   = secrets.choice(['1', '2', '3'])
-    sec_level = secrets.choice(['authPriv','authNoPriv','noAuthNoPriv'])
-    sec_set   = lambda level: {
-        'authNoPriv'   : {
-            'authentication-protocol' : secrets.choice(['MD5', 'SHA']),
-            'authentication-password' : pswd(4),
-        },
-        'authPriv'     : {
-            'authentication-protocol' : secrets.choice(['MD5', 'SHA']),
-            'authentication-password' : pswd(4),
-            'privacy-protocol'        : secrets.choice(['AES', 'DES']),
-            'privacy-passphrase'      : pswd(4)
-        },
-        'noAuthNoPriv' : {}
-    }[level]
+def set_security(level):
+    auth = lambda: {
+        'authentication-protocol' : secrets.choice(['MD5', 'SHA']),
+        'authentication-password' : pswd(4),
+    }
 
-    default = {
-        'version'                 : version,
+    priv = lambda: {
+        'privacy-protocol'        : secrets.choice(['AES', 'DES']),
+        'privacy-passphrase'      : pswd(4)
+    }
+
+    match level:
+        case 'authPriv':
+            return auth() | priv()
+        case 'authNoPriv':
+            return auth()
+        case 'noAuthNoPriv':
+            return {}
+
+def snmp_defaults():
+    return {
         'community'               : '',
         'username'                : '',
         'security-level'          : '',
@@ -60,20 +62,29 @@ def snmp():
         'privacy-protocol'        : '',
         'privacy-passphrase'      : ''
     }
-    setup   = {
-        '1' : {
-            'community' : pswd(4),
-        },
-        '2' : {
-            'community' : pswd(4),
-        },
-        '3' : {
-            'security-level' : sec_level,
-            'username'       : pswd(4),
-        } | sec_set(sec_level)
-    }[version]
 
-    return default | setup
+def snmp_params(version):
+    community = lambda: {
+        'community' : pswd(4)
+    }
+
+    security = lambda level: {
+        'security-level' : level,
+        'username'       : pswd(4)
+    } | set_security(level)
+
+    match version:
+        case '1' | '2':
+            params = community()
+        case '3':
+            level  = secrets.choice(['authPriv','authNoPriv','noAuthNoPriv'])
+            params = security(level)
+
+    return {'version' : version} | params
+
+def snmp():
+    version = secrets.choice(['1', '2', '3'])
+    return snmp_defaults() | snmp_params(version)
 
 if __name__ == "__main__":
     pipe(
